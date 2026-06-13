@@ -1,0 +1,240 @@
+/* ============================================
+   GLOBAL STYLES — KUBURAN TERLARANG
+   ============================================ */
+
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+:root {
+    --horror-red: #8b0000;
+    --horror-red-glow: #ff0000;
+    --horror-dark: #0a0a0a;
+    --horror-fog: rgba(20, 20, 30, 0.85);
+    --font-horror: 'Creepster', cursive;
+    --font-body: 'Roboto', sans-serif;
+}
+
+html,
+body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: #000;
+    color: #fff;
+    font-family: var(--font-body);
+    /* cursor default — dikontrol via JS */
+    cursor: default;
+}
+
+
+/* Kursor custom  */
+
+.screen {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: none;
+    z-index: 10;
+}
+
+.screen.active {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.hidden {
+    display: none !important;
+}
+
+
+/* Fade transition */
+
+.fade-in {
+    animation: fadeIn 0.8s ease forwards;
+}
+
+.fade-out {
+    animation: fadeOut 0.8s ease forwards;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes fadeOut {
+    from {
+        opacity: 1;
+    }
+    to {
+        opacity: 0;
+    }
+}
+
+
+/* Screen shake */
+
+@keyframes screenShake {
+    0%,
+    100% {
+        transform: translate(0, 0) rotate(0deg);
+    }
+    10% {
+        transform: translate(-5px, -5px) rotate(-0.5deg);
+    }
+    20% {
+        transform: translate(5px, 5px) rotate(0.5deg);
+    }
+    30% {
+        transform: translate(-5px, 5px) rotate(-0.5deg);
+    }
+    40% {
+        transform: translate(5px, -5px) rotate(0.5deg);
+    }
+    50% {
+        transform: translate(-3px, 3px) rotate(-0.3deg);
+    }
+    60% {
+        transform: translate(3px, -3px) rotate(0.3deg);
+    }
+    70% {
+        transform: translate(-3px, -3px) rotate(-0.3deg);
+    }
+    80% {
+        transform: translate(3px, 3px) rotate(0.3deg);
+    }
+    90% {
+        transform: translate(-2px, 2px) rotate(-0.1deg);
+    }
+}
+
+.shake {
+    animation: screenShake 0.5s ease;
+}
+
+
+/* Fog layer */
+
+.fog-layer {
+    position: absolute;
+    width: 200%;
+    height: 200%;
+    top: -50%;
+    left: -50%;
+    background: radial-gradient(ellipse at center, transparent 20%, rgba(10, 10, 20, 0.6) 60%, rgba(5, 5, 15, 0.9) 100%);
+    animation: fogDrift 15s linear infinite alternate;
+    pointer-events: none;
+}
+
+@keyframes fogDrift {
+    0% {
+        transform: translate(0, 0);
+    }
+    100% {
+        transform: translate(30px, 20px);
+    }
+}
+
+
+/* Panel base */
+
+.panel {
+    background: rgba(5, 5, 10, 0.96);
+    border: 1px solid var(--horror-red);
+    box-shadow: 0 0 40px rgba(139, 0, 0, 0.5), inset 0 0 80px rgba(0, 0, 0, 0.8);
+    flex-direction: column;
+    padding: 40px;
+    max-width: 700px;
+    width: 90%;
+    max-height: 90vh;
+    overflow-y: auto;
+    border-radius: 4px;
+}
+
+.panel-title {
+    font-family: var(--font-horror);
+    font-size: 2.5rem;
+    color: var(--horror-red-glow);
+    text-shadow: 0 0 20px var(--horror-red-glow);
+    text-align: center;
+    margin-bottom: 30px;
+    letter-spacing: 4px;
+}
+
+.back-btn {
+    margin-top: 30px;
+    align-self: center;
+}
+
+
+/* Scrollbar horror style */
+
+::-webkit-scrollbar {
+    width: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: #0a0a0a;
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--horror-red);
+    border-radius: 3px;
+}
+
+
+/* Canvas game — cursor disembunyikan saat bermain (dikontrol JS) */
+
+#game-canvas {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1;
+    cursor: none;
+    /* default none, tapi akan di-override saat non-playing */
+}
+
+
+/* Saat game tidak aktif, tampilkan cursor normal */
+
+body.show-cursor #game-canvas {
+    cursor: default;
+}
+
+
+/* Red flash overlay */
+
+.red-flash {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(180, 0, 0, 0.6);
+    z-index: 100;
+    pointer-events: none;
+    animation: redFlash 0.3s ease forwards;
+}
+
+@keyframes redFlash {
+    0% {
+        opacity: 1;
+    }
+    100% {
+        opacity: 0;
+    }
+}

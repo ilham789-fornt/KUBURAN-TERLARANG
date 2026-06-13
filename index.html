@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>KUBURAN TERLARANG</title>
+
+    <!-- CSS -->
+    <link rel="stylesheet" href="css/style.css" />
+    <link rel="stylesheet" href="css/menu.css" />
+    <link rel="stylesheet" href="css/hud.css" />
+    <link rel="stylesheet" href="css/tutorial.css" />
+    <link rel="stylesheet" href="css/rules.css" />
+
+    <!-- Google Fonts: Horror Style -->
+    <link href="https://fonts.googleapis.com/css2?family=Creepster&family=Roboto:wght@300;400;700&display=swap" rel="stylesheet" />
+</head>
+
+<body>
+
+    <!-- ========== LOADING SCREEN ========== -->
+    <div id="loading-screen" class="screen active">
+        <div class="fog-layer"></div>
+        <div class="loading-content">
+            <h1 class="loading-title">KUBURAN TERLARANG</h1>
+            <div class="loading-bar-container">
+                <div id="loading-bar" class="loading-bar"></div>
+            </div>
+            <p id="loading-percent">0%</p>
+            <p id="loading-tip" class="loading-tip"></p>
+        </div>
+    </div>
+
+    <!-- ========== MAIN MENU ========== -->
+    <div id="main-menu" class="screen">
+        <canvas id="menu-canvas"></canvas>
+        <div class="menu-overlay">
+            <div class="menu-lightning" id="menu-lightning"></div>
+            <div class="menu-fog"></div>
+            <h1 class="game-title">KUBURAN<br>TERLARANG</h1>
+            <nav class="menu-nav">
+                <button class="menu-btn" id="btn-play">PLAY</button>
+                <button class="menu-btn" id="btn-options">OPTIONS</button>
+                <button class="menu-btn" id="btn-tutorial">TUTORIAL</button>
+                <button class="menu-btn" id="btn-rules">RULES</button>
+                <button class="menu-btn" id="btn-exit">EXIT</button>
+            </nav>
+        </div>
+    </div>
+
+    <!-- ========== OPTIONS PANEL ========== -->
+    <div id="options-panel" class="screen panel">
+        <h2 class="panel-title">OPTIONS</h2>
+        <div class="panel-content">
+            <div class="options-section">
+                <h3>AUDIO</h3>
+                <label>Master Volume <span id="master-val">80</span>%
+          <input type="range" id="master-vol" min="0" max="100" value="80" />
+        </label>
+                <label>Music Volume <span id="music-val">70</span>%
+          <input type="range" id="music-vol" min="0" max="100" value="70" />
+        </label>
+                <label>SFX Volume <span id="sfx-val">80</span>%
+          <input type="range" id="sfx-vol" min="0" max="100" value="80" />
+        </label>
+                <label>Voice Volume <span id="voice-val">100</span>%
+          <input type="range" id="voice-vol" min="0" max="100" value="100" />
+        </label>
+            </div>
+            <div class="options-section">
+                <h3>CONTROLS</h3>
+                <label>Mouse Sensitivity <span id="sens-val">5</span>
+          <input type="range" id="mouse-sens" min="1" max="10" value="5" />
+        </label>
+                <label>Invert Mouse
+          <button class="toggle-btn" id="invert-mouse">OFF</button>
+        </label>
+            </div>
+            <div class="options-section">
+                <h3>GRAPHICS</h3>
+                <label>Fog Quality
+          <select id="fog-quality"><option>Low</option><option selected>Medium</option><option>High</option></select>
+        </label>
+                <label>Shadow Quality
+          <select id="shadow-quality"><option>Low</option><option selected>Medium</option><option>High</option></select>
+        </label>
+            </div>
+        </div>
+        <button class="menu-btn back-btn" id="btn-options-back">BACK</button>
+    </div>
+
+    <!-- ========== TUTORIAL ========== -->
+    <div id="tutorial-panel" class="screen panel">
+        <h2 class="panel-title">TUTORIAL</h2>
+        <div id="tutorial-content" class="tutorial-content"></div>
+        <button class="menu-btn back-btn" id="btn-tutorial-back">BACK</button>
+    </div>
+
+    <!-- ========== RULES ========== -->
+    <div id="rules-panel" class="screen panel">
+        <div class="rules-book">
+            <h2 class="rules-title">📜 KITAB LARANGAN</h2>
+            <div class="rules-content">
+                <h3>⚔️ Tujuan Permainan</h3>
+                <p>Usir <strong>10 hantu</strong> untuk menang.</p>
+                <h3>✅ Menang Jika:</h3>
+                <ul>
+                    <li>Berhasil mengusir 10 hantu</li>
+                    <li>Tidak gagal satu pun challenge</li>
+                </ul>
+                <h3>💀 Kalah Jika:</h3>
+                <ul>
+                    <li>Gagal membaca bacaan</li>
+                    <li>Waktu challenge habis</li>
+                    <li>Hantu berhasil menyerang</li>
+                </ul>
+                <h3>⚠️ Peringatan:</h3>
+                <ul>
+                    <li>Game ini menggunakan mikrofon</li>
+                    <li>Gunakan headset untuk hasil terbaik</li>
+                    <li>Mainkan di ruangan yang tenang</li>
+                </ul>
+            </div>
+            <button class="menu-btn back-btn" id="btn-rules-back">BACK</button>
+        </div>
+    </div>
+
+    <!-- ========== GAME CANVAS ========== -->
+    <canvas id="game-canvas" class="hidden"></canvas>
+
+    <!-- ========== HUD ========== -->
+    <div id="hud" class="hidden">
+        <div class="hud-top">
+            <div class="hud-item" id="hud-score">SCORE: <span id="score-val">0</span></div>
+            <div class="hud-item" id="hud-ghosts">👻 <span id="ghost-val">0</span>/10</div>
+            <div class="hud-item" id="hud-time" style="display:none">⏱ <span id="timer-val">15</span>s</div>
+        </div>
+        <div class="hud-bottom">
+            <div class="hud-flashlight">
+                <span>🔦</span>
+                <div class="battery-bar">
+                    <div id="battery-fill" class="battery-fill"></div>
+                </div>
+                <span id="battery-pct">100%</span>
+            </div>
+        </div>
+        <!-- Challenge UI -->
+        <div id="challenge-ui" class="hidden">
+            <div class="challenge-box">
+                <h3 class="challenge-title">⚠️ MAKHLUK MENDEKAT!</h3>
+                <p class="challenge-instruction">Baca dengan keras menggunakan mikrofon:</p>
+                <div class="challenge-text" id="challenge-text">A'udzu billahi minasy syaithanir rajim</div>
+                <div class="challenge-progress">
+                    <div class="similarity-bar">
+                        <div id="similarity-fill" class="similarity-fill"></div>
+                    </div>
+                    <span id="similarity-pct">0%</span>
+                </div>
+                <p class="mic-status" id="mic-status">🎙️ Mikrofon aktif — Bacalah sekarang!</p>
+                <div class="challenge-timer">⏱ <span id="challenge-timer">15</span>s</div>
+            </div>
+        </div>
+        <!-- Result Flash -->
+        <div id="result-flash" class="hidden"></div>
+        <!-- Red Flash -->
+        <div id="red-flash" class="red-flash hidden"></div>
+    </div>
+
+    <!-- ========== PAUSE MENU ========== -->
+    <div id="pause-menu" class="screen hidden">
+        <div class="pause-overlay"></div>
+        <div class="pause-content">
+            <h2>PAUSE</h2>
+            <button class="menu-btn" id="btn-resume">RESUME</button>
+            <button class="menu-btn" id="btn-pause-options">OPTIONS</button>
+            <button class="menu-btn" id="btn-pause-main">MAIN MENU</button>
+            <button class="menu-btn" id="btn-quit">QUIT GAME</button>
+        </div>
+    </div>
+
+    <!-- ========== JUMPSCARE ========== -->
+    <div id="jumpscare" class="hidden">
+        <div id="jumpscare-img" class="jumpscare-img"></div>
+        <div id="jumpscare-distortion" class="distortion"></div>
+    </div>
+
+    <!-- ========== GAME OVER ========== -->
+    <div id="gameover-screen" class="screen hidden">
+        <canvas id="go-canvas"></canvas>
+        <div class="gameover-content">
+            <h1 class="gameover-title">ANDA MENJADI<br>KORBAN MAKHLUK<br>TERSEBUT</h1>
+            <button class="menu-btn" id="btn-restart">RESTART</button>
+            <button class="menu-btn" id="btn-go-main">MAIN MENU</button>
+        </div>
+    </div>
+
+    <!-- ========== VICTORY SCREEN ========== -->
+    <div id="victory-screen" class="screen hidden">
+        <div id="victory-particles" class="particles"></div>
+        <div class="victory-content">
+            <h1 class="victory-title">ANDA SELAMAT</h1>
+            <div class="victory-stats">
+                <p>👻 Hantu Diusir: <span id="v-ghosts">10</span></p>
+                <p>🎯 Akurasi Rata-rata: <span id="v-accuracy">0</span>%</p>
+                <p>⏱ Waktu Bermain: <span id="v-time">0:00</span></p>
+            </div>
+            <button class="menu-btn" id="btn-victory-main">MAIN MENU</button>
+            <button class="menu-btn" id="btn-play-again">PLAY AGAIN</button>
+        </div>
+    </div>
+
+    <!-- Three.js via CDN -->
+    <script type="importmap">
+        { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/" } }
+    </script>
+
+    <script>
+        window.addEventListener('error', (event) => {
+            const loadingTip = document.getElementById('loading-tip');
+            const loadingPercent = document.getElementById('loading-percent');
+            if (loadingPercent) loadingPercent.textContent = 'ERROR';
+            if (loadingTip) loadingTip.textContent = event.message || 'Gagal memuat game.';
+        });
+
+        window.addEventListener('unhandledrejection', (event) => {
+            const loadingTip = document.getElementById('loading-tip');
+            const loadingPercent = document.getElementById('loading-percent');
+            const reason = event.reason?.message || event.reason || 'Gagal memuat game.';
+            if (loadingPercent) loadingPercent.textContent = 'ERROR';
+            if (loadingTip) loadingTip.textContent = reason;
+        });
+    </script>
+
+    <!-- Entry Point -->
+    <script type="module" src="js/main.js"></script>
+
+</body>
+
+</html>

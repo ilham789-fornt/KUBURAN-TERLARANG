@@ -1,0 +1,57 @@
+/* ============================================
+   TUTORIAL STYLES
+   ============================================ */
+
+#tutorial-panel {
+    display: none;
+}
+
+#tutorial-panel.active {
+    display: flex;
+}
+
+.tutorial-content {
+    color: rgba(255, 255, 255, 0.85);
+    font-size: 1rem;
+    line-height: 1.8;
+    min-height: 300px;
+}
+
+.tutorial-content h3 {
+    font-family: 'Creepster', cursive;
+    color: var(--horror-red-glow);
+    font-size: 1.6rem;
+    margin: 20px 0 10px;
+    text-shadow: 0 0 10px rgba(255, 0, 0, 0.5);
+    letter-spacing: 2px;
+}
+
+.tutorial-content li {
+    list-style: none;
+    padding: 4px 0;
+}
+
+.tutorial-content li::before {
+    content: '▸ ';
+    color: var(--horror-red);
+}
+
+.cursor-blink {
+    display: inline-block;
+    width: 2px;
+    height: 1em;
+    background: #fff;
+    margin-left: 2px;
+    vertical-align: text-bottom;
+    animation: blink 0.8s step-end infinite;
+}
+
+@keyframes blink {
+    0%,
+    100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0;
+    }
+}

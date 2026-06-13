@@ -1,0 +1,325 @@
+/* ============================================
+   MAIN MENU STYLES
+   ============================================ */
+
+#main-menu {
+    background: #000;
+    overflow: hidden;
+}
+
+#menu-canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 0;
+}
+
+.menu-overlay {
+    position: relative;
+    z-index: 5;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+}
+
+.menu-fog {
+    position: absolute;
+    bottom: 0;
+    left: -10%;
+    width: 120%;
+    height: 40%;
+    background: linear-gradient(to top, rgba(20, 25, 30, 0.9) 0%, rgba(20, 25, 30, 0.4) 50%, transparent 100%);
+    animation: fogRise 8s ease-in-out infinite alternate;
+    pointer-events: none;
+    z-index: 1;
+}
+
+@keyframes fogRise {
+    0% {
+        transform: translateY(0) scaleY(1);
+        opacity: 0.7;
+    }
+    100% {
+        transform: translateY(-20px) scaleY(1.1);
+        opacity: 1;
+    }
+}
+
+.menu-lightning {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(200, 220, 255, 0);
+    pointer-events: none;
+    z-index: 2;
+    transition: background 0.05s;
+}
+
+.menu-lightning.flash {
+    background: rgba(200, 220, 255, 0.15);
+}
+
+.game-title {
+    font-family: 'Creepster', cursive;
+    font-size: clamp(3rem, 8vw, 7rem);
+    color: #fff;
+    text-align: center;
+    text-shadow: 0 0 20px #8b0000, 0 0 40px #8b0000, 0 0 80px rgba(139, 0, 0, 0.5), 2px 2px 4px #000;
+    line-height: 1.1;
+    margin-bottom: 50px;
+    letter-spacing: 6px;
+    z-index: 5;
+    animation: titlePulse 3s ease-in-out infinite;
+}
+
+@keyframes titlePulse {
+    0%,
+    100% {
+        text-shadow: 0 0 20px #8b0000, 0 0 40px #8b0000, 2px 2px 4px #000;
+    }
+    50% {
+        text-shadow: 0 0 30px #ff0000, 0 0 60px #cc0000, 0 0 100px rgba(255, 0, 0, 0.3), 2px 2px 4px #000;
+    }
+}
+
+.menu-nav {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    z-index: 5;
+    align-items: center;
+}
+
+.menu-btn {
+    font-family: 'Creepster', cursive;
+    font-size: 1.5rem;
+    letter-spacing: 4px;
+    color: #ccc;
+    background: transparent;
+    border: 1px solid rgba(139, 0, 0, 0.5);
+    padding: 12px 50px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    min-width: 240px;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+}
+
+.menu-btn::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    background: rgba(139, 0, 0, 0.3);
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    transition: width 0.4s, height 0.4s;
+}
+
+.menu-btn:hover {
+    color: #fff;
+    border-color: var(--horror-red-glow);
+    box-shadow: 0 0 20px rgba(255, 0, 0, 0.6), 0 0 40px rgba(139, 0, 0, 0.3);
+    transform: scale(1.06);
+    text-shadow: 0 0 10px #ff0000;
+}
+
+.menu-btn:hover::before {
+    width: 300px;
+    height: 300px;
+}
+
+.menu-btn:active {
+    transform: scale(0.98);
+}
+
+
+/* Loading Screen */
+
+#loading-screen {
+    background: #000;
+    flex-direction: column;
+    text-align: center;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    z-index: 1000;
+}
+
+.loading-content {
+    position: relative;
+    z-index: 5;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+    padding: 40px;
+}
+
+.loading-title {
+    font-family: 'Creepster', cursive;
+    font-size: clamp(2rem, 5vw, 4rem);
+    color: #fff;
+    text-shadow: 0 0 30px #8b0000, 0 0 60px rgba(139, 0, 0, 0.5);
+    letter-spacing: 6px;
+}
+
+.loading-bar-container {
+    width: 400px;
+    max-width: 80vw;
+    height: 8px;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(139, 0, 0, 0.5);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.loading-bar {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(to right, #8b0000, #ff0000);
+    box-shadow: 0 0 10px #ff0000;
+    transition: width 0.3s ease;
+    border-radius: 4px;
+}
+
+#loading-percent {
+    font-size: 1.2rem;
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.loading-tip {
+    font-size: 0.9rem;
+    color: rgba(255, 255, 255, 0.5);
+    font-style: italic;
+    max-width: 500px;
+}
+
+
+/* Pause Menu */
+
+#pause-menu {
+    z-index: 200;
+    background: transparent;
+}
+
+.pause-overlay {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(8px);
+}
+
+.pause-content {
+    position: relative;
+    z-index: 5;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+}
+
+.pause-content h2 {
+    font-family: 'Creepster', cursive;
+    font-size: 4rem;
+    color: #fff;
+    text-shadow: 0 0 30px #8b0000;
+    letter-spacing: 8px;
+    margin-bottom: 20px;
+}
+
+
+/* Victory & Game Over */
+
+#victory-screen {
+    background: radial-gradient(ellipse at center, rgba(255, 255, 200, 0.1) 0%, #000 70%);
+    flex-direction: column;
+}
+
+.victory-content,
+.gameover-content {
+    position: relative;
+    z-index: 5;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+}
+
+.victory-title {
+    font-family: 'Creepster', cursive;
+    font-size: clamp(3rem, 7vw, 6rem);
+    color: #fffacd;
+    text-shadow: 0 0 30px #fff, 0 0 60px rgba(255, 255, 200, 0.5);
+    animation: victoryGlow 2s ease-in-out infinite;
+}
+
+@keyframes victoryGlow {
+    0%,
+    100% {
+        text-shadow: 0 0 30px #fff, 0 0 60px rgba(255, 255, 200, 0.5);
+    }
+    50% {
+        text-shadow: 0 0 50px #fff, 0 0 100px rgba(255, 255, 200, 0.8);
+    }
+}
+
+.victory-stats {
+    background: rgba(0, 0, 0, 0.5);
+    border: 1px solid rgba(255, 255, 200, 0.3);
+    padding: 20px 40px;
+    border-radius: 4px;
+}
+
+.victory-stats p {
+    font-size: 1.2rem;
+    margin: 8px 0;
+    color: rgba(255, 255, 200, 0.9);
+}
+
+.particles {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+}
+
+#gameover-screen {
+    background: #000;
+    flex-direction: column;
+}
+
+#go-canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+}
+
+.gameover-title {
+    font-family: 'Creepster', cursive;
+    font-size: clamp(2rem, 5vw, 4rem);
+    color: var(--horror-red-glow);
+    text-shadow: 0 0 30px #ff0000, 0 0 60px rgba(255, 0, 0, 0.3);
+    text-align: center;
+    line-height: 1.2;
+    animation: titlePulse 2s ease-in-out infinite;
+}

@@ -1,0 +1,329 @@
+/* ============================================
+   HUD STYLES — KUBURAN TERLARANG
+   ============================================ */
+
+#hud {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 50;
+    pointer-events: none;
+    font-family: var(--font-body);
+}
+
+
+/* Top bar */
+
+.hud-top {
+    position: absolute;
+    top: 20px;
+    left: 0;
+    right: 0;
+    display: flex;
+    justify-content: center;
+    gap: 40px;
+    padding: 0 20px;
+}
+
+.hud-item {
+    background: rgba(0, 0, 0, 0.7);
+    border: 1px solid rgba(139, 0, 0, 0.5);
+    padding: 6px 18px;
+    border-radius: 3px;
+    font-size: 1rem;
+    color: rgba(255, 255, 255, 0.9);
+    letter-spacing: 2px;
+    text-shadow: 0 0 10px rgba(139, 0, 0, 0.7);
+}
+
+
+/* Bottom bar */
+
+.hud-bottom {
+    position: absolute;
+    bottom: 20px;
+    left: 20px;
+}
+
+.hud-flashlight {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(0, 0, 0, 0.7);
+    border: 1px solid rgba(139, 0, 0, 0.5);
+    padding: 6px 14px;
+    border-radius: 3px;
+}
+
+.battery-bar {
+    width: 80px;
+    height: 8px;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.battery-fill {
+    height: 100%;
+    width: 100%;
+    background: linear-gradient(to right, #00ff00, #88ff00);
+    transition: width 0.5s ease, background 0.5s ease;
+    border-radius: 4px;
+}
+
+.battery-fill.low {
+    background: linear-gradient(to right, #ff4400, #ff0000);
+    animation: batteryPulse 1s ease-in-out infinite;
+}
+
+@keyframes batteryPulse {
+    0%,
+    100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+    }
+}
+
+#battery-pct {
+    font-size: 0.75rem;
+    color: rgba(255, 255, 255, 0.7);
+}
+
+
+/* Crosshair */
+
+#hud::after {
+    content: '+';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: rgba(255, 255, 255, 0.4);
+    font-size: 1.2rem;
+    pointer-events: none;
+}
+
+
+/* Challenge UI */
+
+#challenge-ui {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    z-index: 60;
+}
+
+.challenge-box {
+    background: rgba(0, 0, 0, 0.92);
+    border: 2px solid var(--horror-red-glow);
+    box-shadow: 0 0 40px rgba(255, 0, 0, 0.5);
+    padding: 30px 40px;
+    border-radius: 4px;
+    text-align: center;
+    min-width: 500px;
+    max-width: 90vw;
+    animation: challengeAppear 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+@keyframes challengeAppear {
+    0% {
+        transform: scale(0.5);
+        opacity: 0;
+    }
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+.challenge-title {
+    font-family: 'Creepster', cursive;
+    font-size: 1.8rem;
+    color: #ff4400;
+    text-shadow: 0 0 20px #ff0000;
+    margin-bottom: 10px;
+    letter-spacing: 3px;
+}
+
+.challenge-instruction {
+    font-size: 0.85rem;
+    color: rgba(255, 255, 255, 0.6);
+    margin-bottom: 16px;
+}
+
+.challenge-text {
+    font-size: 1.6rem;
+    color: #fff;
+    font-style: italic;
+    letter-spacing: 2px;
+    padding: 16px;
+    background: rgba(139, 0, 0, 0.2);
+    border: 1px solid rgba(139, 0, 0, 0.4);
+    border-radius: 3px;
+    margin-bottom: 16px;
+    font-family: 'Creepster', cursive;
+}
+
+.challenge-progress {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.similarity-bar {
+    flex: 1;
+    height: 12px;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+.similarity-fill {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(to right, #ff0000, #ff4400);
+    border-radius: 6px;
+    transition: width 0.3s ease, background 0.3s ease;
+}
+
+.similarity-fill.good {
+    background: linear-gradient(to right, #00aa00, #00ff00);
+}
+
+#similarity-pct {
+    font-size: 1rem;
+    color: #fff;
+    min-width: 45px;
+    text-align: right;
+}
+
+.mic-status {
+    font-size: 0.85rem;
+    color: rgba(255, 255, 255, 0.6);
+    margin-bottom: 10px;
+    animation: micPulse 1.5s ease-in-out infinite;
+}
+
+@keyframes micPulse {
+    0%,
+    100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.4;
+    }
+}
+
+.challenge-timer {
+    font-family: 'Creepster', cursive;
+    font-size: 1.8rem;
+    color: #ff4400;
+}
+
+
+/* Result Flash */
+
+#result-flash {
+    position: absolute;
+    top: 30%;
+    left: 50%;
+    transform: translateX(-50%);
+    font-family: 'Creepster', cursive;
+    font-size: 3rem;
+    letter-spacing: 4px;
+    text-align: center;
+    text-shadow: 0 0 30px currentColor;
+    animation: resultFlash 2s ease forwards;
+    pointer-events: none;
+}
+
+@keyframes resultFlash {
+    0% {
+        opacity: 0;
+        transform: translateX(-50%) scale(0.5);
+    }
+    20% {
+        opacity: 1;
+        transform: translateX(-50%) scale(1.1);
+    }
+    70% {
+        opacity: 1;
+        transform: translateX(-50%) scale(1);
+    }
+    100% {
+        opacity: 0;
+        transform: translateX(-50%) scale(0.9);
+    }
+}
+
+
+/* Jumpscare */
+
+#jumpscare {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 500;
+    background: #000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.jumpscare-img {
+    width: 100%;
+    height: 100%;
+    background-image: url('../assets/images/jumpscare.jpg');
+    background-size: cover;
+    background-position: center;
+    background-color: #1a0000;
+    animation: jumpscareZoom 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+}
+
+@keyframes jumpscareZoom {
+    0% {
+        transform: scale(0.5) rotate(-5deg);
+        opacity: 0;
+    }
+    30% {
+        transform: scale(1.3) rotate(2deg);
+        opacity: 1;
+    }
+    60% {
+        transform: scale(0.95) rotate(-1deg);
+    }
+    100% {
+        transform: scale(1) rotate(0deg);
+    }
+}
+
+.distortion {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: repeating-linear-gradient( 0deg, transparent, transparent 2px, rgba(255, 0, 0, 0.03) 2px, rgba(255, 0, 0, 0.03) 4px);
+    animation: distortLines 0.1s linear infinite;
+    pointer-events: none;
+}
+
+@keyframes distortLines {
+    0% {
+        transform: translateY(0);
+    }
+    100% {
+        transform: translateY(4px);
+    }
+}
