@@ -28,6 +28,10 @@ class AudioManager {
             { id: 'ui_click', src: 'assets/sounds/ui_click.mp3', category: 'sfx', loop: false },
             { id: 'jumpscare', src: 'assets/sounds/jumpscare.mp3', category: 'sfx', loop: false },
             { id: 'victory', src: 'assets/sounds/victory.mp3', category: 'music', loop: false },
+            { id: 'jumpscare_kuntilanak', src: 'assets/sounds/jumpscare_kuntilanak.mp3', category: 'sfx', loop: false },
+            { id: 'jumpscare_pocong', src: 'assets/sounds/jumpscare_pocong.mp3', category: 'sfx', loop: false },
+            { id: 'jumpscare_tuyul', src: 'assets/sounds/jumpscare_tuyul.mp3', category: 'sfx', loop: false },
+            { id: 'jumpscare_kuyang', src: 'assets/sounds/jumpscare_kuyang.mp3', category: 'sfx', loop: false },
         ];
     }
 
@@ -73,7 +77,7 @@ class AudioManager {
         const reg = this._registry.find(r => r.id === id);
         audio.volume = this._getVolume(reg?.category || 'sfx');
         audio.currentTime = 0;
-        audio.play().catch(() => {});
+        audio.play().catch(() => { });
         return audio;
     }
 

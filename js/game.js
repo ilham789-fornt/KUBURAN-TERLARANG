@@ -1,6 +1,7 @@
 /**
  * game.js — Game engine utama.
  * Mengelola world 3D, game loop, dan state machine.
+ * Versi lengkap: Sistem Misi Bertahap + Jumpscare Per Hantu
  */
 
 import * as THREE from 'three';
@@ -11,11 +12,15 @@ import { UIManager } from './ui.js';
 import { JumpscareSystem } from './jumpscare.js';
 import { audioManager } from './audio.js';
 import { randomInt } from './utils.js';
+import { CandleSystem, FragmentSystem, AltarSystem } from './mission.js';
+import { MissionUI } from './missionUI.js';
 
-/** Total hantu yang harus diusir untuk menang. */
-const GHOSTS_TO_WIN = 10;
-/** Durasi challenge dalam detik. */
+/** Durasi challenge normal dalam detik. */
 const CHALLENGE_DURATION = 15;
+/** Durasi challenge ritual altar dalam detik. */
+const RITUAL_DURATION = 20;
+/** Teks doa khusus untuk ritual Fase 3. */
+const ALTAR_RITUAL_TEXT = "Bismillah, dengan nama Allah yang Maha Pengasih lagi Maha Penyayang, aku usir semua roh jahat dari tempat ini";
 
 export class Game {
     constructor() {
@@ -36,8 +41,15 @@ export class Game {
         this.ui = new UIManager();
         this.jumpscare = new JumpscareSystem();
 
+        // Mission systems (diinisialisasi di start())
+        this.candleSystem = null;
+        this.fragmentSystem = null;
+        this.altarSystem = null;
+        this.missionUI = null;
+        this.missionPhase = 1;
+
         // Game state
-        this.state = 'idle'; // idle | playing | challenge | paused | gameover | victory
+        this.state = 'idle'; // idle | playing | challenge | ritual | paused | gameover | victory
         this.score = 0;
         this.ghostsKilled = 0;
         this.playTime = 0;
@@ -45,32 +57,55 @@ export class Game {
         this._animId = null;
         this._challengeGhost = null;
         this._challengeTimer = 0;
-        this._challengeTimeout = null;
+
+        // Simpan listener agar bisa di-remove nanti
+        this._keyListener = null;
+        this._interactListener = null;
 
         // Resize
         window.addEventListener('resize', () => this._onResize());
 
         // Pause on ESC
-        window.addEventListener('keydown', (e) => {
+        this._keyListener = (e) => {
             if (e.code === 'Escape' && this.state === 'playing') this._pause();
             else if (e.code === 'Escape' && this.state === 'paused') this._resume();
-        });
+        };
+        window.addEventListener('keydown', this._keyListener);
     }
 
     /** Mulai game baru. */
     start() {
         this.canvas.classList.remove('hidden');
+        document.body.classList.remove('show-cursor');
         this.ui.showHUD();
         this._buildWorld();
         this.player = new Player(this.scene, this.renderer);
         this.ghostMgr = new GhostManager(this.scene);
 
+        // Reset statistik
         this.score = 0;
         this.ghostsKilled = 0;
         this.playTime = 0;
         this.accuracySum = 0;
+        this.missionPhase = 1;
         this.ui.updateScore(0);
         this.ui.updateGhostCount(0);
+
+        // Inisialisasi sistem misi
+        this.candleSystem = new CandleSystem(this.scene, 3);
+        this.fragmentSystem = new FragmentSystem(this.scene, 3);
+        this.altarSystem = new AltarSystem(this.scene);
+        this.missionUI = new MissionUI();
+        this.missionUI.update(1, 0, 3, '[ E ] Dekat lilin untuk menyalakan');
+
+        // Set spawn rate awal (lambat di fase 1)
+        this.ghostMgr.setPhase(1);
+
+        // Binding tombol E untuk interaksi objek misi
+        this._interactListener = (e) => {
+            if (e.code === 'KeyE') this._handleInteract();
+        };
+        window.addEventListener('keydown', this._interactListener);
 
         this.state = 'playing';
         this.clock.start();
@@ -90,9 +125,19 @@ export class Game {
         this.state = 'idle';
         if (this._animId) cancelAnimationFrame(this._animId);
         this.canvas.classList.add('hidden');
+        document.body.classList.add('show-cursor');
+        document.exitPointerLock();
         this.ui.hideHUD();
+        this.missionUI?.hide();
         this.voice.stop();
         audioManager.stopAll();
+
+        // Hapus listener interaksi agar tidak duplikat saat restart
+        if (this._interactListener) {
+            window.removeEventListener('keydown', this._interactListener);
+            this._interactListener = null;
+        }
+
         // Bersihkan scene
         while (this.scene.children.length > 0) {
             this.scene.remove(this.scene.children[0]);
@@ -111,18 +156,140 @@ export class Game {
             this.ghostMgr.update(delta, this.player.getPosition(), (ghost) => {
                 this._startChallenge(ghost);
             });
+
+            // Update sistem misi
+            this.candleSystem?.update(delta);
+            this.fragmentSystem?.update(delta);
+            this.altarSystem?.update(delta);
         }
 
-        if (this.state === 'challenge') {
+        // Timer untuk challenge biasa maupun ritual
+        if (this.state === 'challenge' || this.state === 'ritual') {
             this._challengeTimer -= delta;
             this.ui.updateChallengeTimer(this._challengeTimer);
             if (this._challengeTimer <= 0) {
-                this._onChallengeFail('timeout');
+                if (this.state === 'ritual') {
+                    this._onRitualFail();
+                } else {
+                    this._onChallengeFail('timeout');
+                }
             }
         }
 
         this.renderer.render(this.scene, this.player?.camera || new THREE.PerspectiveCamera());
     }
+
+    // ============================================================
+    // SISTEM MISI — Interaksi Objek
+    // ============================================================
+
+    /** Dipanggil saat pemain menekan [E]. */
+    _handleInteract() {
+        if (this.state !== 'playing') return;
+        const playerPos = this.player.getPosition();
+
+        // FASE 1: Nyalakan lilin
+        if (this.missionPhase === 1) {
+            const candle = this.candleSystem.getNearbyUnlit(playerPos);
+            if (candle) {
+                this.candleSystem.lightCandle(candle);
+                this.missionUI.update(1, this.candleSystem.lit, 3, '[ E ] Dekat lilin untuk menyalakan');
+                this.score += 50;
+                this.ui.updateScore(this.score);
+
+                if (this.candleSystem.isComplete()) {
+                    this.missionUI.showPhaseComplete('✅ SEMUA LILIN MENYALA!');
+                    setTimeout(() => {
+                        this.missionPhase = 2;
+                        this.ghostMgr.setPhase(2); // Spawn lebih sering
+                        this.missionUI.update(2, 0, 3, '[ E ] Dekat jimat untuk mengambil');
+                    }, 2000);
+                }
+            }
+        }
+
+        // FASE 2: Ambil fragmen jimat
+        else if (this.missionPhase === 2) {
+            const frag = this.fragmentSystem.getNearbyUncollected(playerPos);
+            if (frag) {
+                this.fragmentSystem.collect(frag);
+                this.missionUI.update(2, this.fragmentSystem.collected, 3, '[ E ] Dekat jimat untuk mengambil');
+                this.score += 75;
+                this.ui.updateScore(this.score);
+
+                if (this.fragmentSystem.isComplete()) {
+                    this.missionUI.showPhaseComplete('✅ SEMUA JIMAT TERKUMPUL!');
+                    setTimeout(() => {
+                        this.missionPhase = 3;
+                        this.altarSystem.activate();
+                        this.ghostMgr.setPhase(3); // Spawn sangat sering
+                        this.missionUI.update(3, 0, 1, '[ E ] Pergi ke altar di tengah kuburan');
+                    }, 2000);
+                }
+            }
+        }
+
+        // FASE 3: Ritual altar
+        else if (this.missionPhase === 3) {
+            if (this.altarSystem.isPlayerNear(playerPos)) {
+                this._startRitualChallenge();
+            }
+        }
+    }
+
+    /** Mulai ritual challenge di Fase 3. */
+    _startRitualChallenge() {
+        if (this.state !== 'playing') return;
+        this.state = 'ritual';
+        this._challengeTimer = RITUAL_DURATION;
+        this.player.freeze();
+
+        this.ui.showChallenge(ALTAR_RITUAL_TEXT);
+        this.voice.start(ALTAR_RITUAL_TEXT,
+            (similarity) => {
+                this.ui.updateSimilarity(similarity);
+                if (similarity >= 70) { // Threshold sedikit lebih rendah untuk doa panjang
+                    this._onRitualSuccess();
+                }
+            }
+        );
+    }
+
+    /** Ritual berhasil → menang! */
+    _onRitualSuccess() {
+        if (this.state !== 'ritual') return;
+        this.state = 'playing';
+
+        this.voice.stop();
+        this.ui.hideChallenge();
+        this.player.unfreeze();
+        this.missionUI.showPhaseComplete('🌟 RITUAL SELESAI — ANDA MENANG!');
+        this.score += 500;
+        this.ui.updateScore(this.score);
+
+        setTimeout(() => this._onVictory(), 2000);
+    }
+
+    /** Ritual gagal → game over. */
+    _onRitualFail() {
+        if (this.state !== 'ritual') return;
+        this.state = 'gameover';
+
+        this.voice.stop();
+        this.ui.hideChallenge();
+        this.ui.flashRed();
+        this.ui.showResult(false);
+
+        setTimeout(() => {
+            this.jumpscare.trigger(() => {
+                this._showGameOver();
+            }, 'default');
+        }, 800);
+    }
+
+    // ============================================================
+    // CHALLENGE BIASA (Hantu Mendekat)
+    // ============================================================
 
     /** Mulai challenge saat hantu mendekat. */
     _startChallenge(ghost) {
@@ -172,11 +339,6 @@ export class Game {
         setTimeout(() => {
             this.renderer.domElement.requestPointerLock();
         }, 500);
-
-        // Cek menang
-        if (this.ghostsKilled >= GHOSTS_TO_WIN) {
-            setTimeout(() => this._onVictory(), 1500);
-        }
     }
 
     /** Challenge gagal. */
@@ -192,26 +354,39 @@ export class Game {
         // Hantu menyerang
         this._challengeGhost?.attack();
 
+        // Ambil tipe hantu untuk jumpscare yang sesuai
+        const ghostType = this._challengeGhost?.type || 'default';
+
         setTimeout(() => {
             this.jumpscare.trigger(() => {
                 this._showGameOver();
-            });
+            }, ghostType);
         }, 800);
     }
+
+    // ============================================================
+    // PAUSE / RESUME
+    // ============================================================
 
     _pause() {
         this.state = 'paused';
         this.clock.stop();
         document.exitPointerLock();
+        document.body.classList.add('show-cursor');
         this.ui.showPause();
     }
 
     _resume() {
         this.state = 'playing';
         this.clock.start();
+        document.body.classList.remove('show-cursor');
         this.ui.hidePause();
         this.renderer.domElement.requestPointerLock();
     }
+
+    // ============================================================
+    // MENANG / KALAH
+    // ============================================================
 
     _onVictory() {
         this.state = 'victory';
@@ -228,6 +403,10 @@ export class Game {
         this.stop();
         this.ui.showGameOver();
     }
+
+    // ============================================================
+    // BANGUN DUNIA 3D
+    // ============================================================
 
     /** Bangun world kuburan 3D. */
     _buildWorld() {
@@ -261,7 +440,7 @@ export class Game {
         for (let i = 0; i < 60; i++) {
             const x = (Math.random() - 0.5) * 120;
             const z = (Math.random() - 0.5) * 120;
-            if (Math.sqrt(x * x + z * z) < 5) continue; // Jangan spawn di dekat player
+            if (Math.sqrt(x * x + z * z) < 5) continue;
             scene.add(this._makeGravestone(x, 0, z));
         }
 
@@ -280,7 +459,6 @@ export class Game {
         const group = new THREE.Group();
         const h = 0.8 + Math.random() * 0.7;
 
-        // Badan nisan
         const stone = new THREE.Mesh(
             new THREE.BoxGeometry(0.4 + Math.random() * 0.3, h, 0.1),
             new THREE.MeshLambertMaterial({ color: new THREE.Color(0.15, 0.15, 0.2).offsetHSL(0, 0, Math.random() * 0.05) })
@@ -290,7 +468,6 @@ export class Game {
         stone.receiveShadow = true;
         group.add(stone);
 
-        // Bagian atas bulat
         const top = new THREE.Mesh(
             new THREE.CylinderGeometry(0.2 + Math.random() * 0.15, 0.2 + Math.random() * 0.15, 0.1, 8),
             stone.material
@@ -300,7 +477,6 @@ export class Game {
 
         group.position.set(x, y, z);
         group.rotation.y = Math.random() * Math.PI * 2;
-        // Sedikit miring
         group.rotation.z = (Math.random() - 0.5) * 0.2;
         return group;
     }
@@ -317,7 +493,6 @@ export class Game {
         trunk.castShadow = true;
         group.add(trunk);
 
-        // Cabang-cabang
         const numBranches = 3 + Math.floor(Math.random() * 4);
         for (let i = 0; i < numBranches; i++) {
             const bl = 1 + Math.random() * 2;
@@ -349,10 +524,8 @@ export class Game {
         const STEP = 2.5;
         for (let i = -SIZE; i <= SIZE; i += STEP) {
             [
-                [i, 0, -SIZE],
-                [i, 0, SIZE],
-                [-SIZE, 0, i],
-                [SIZE, 0, i]
+                [i, 0, -SIZE], [i, 0, SIZE],
+                [-SIZE, 0, i], [SIZE, 0, i]
             ].forEach(([x, y, z]) => {
                 const post = new THREE.Mesh(
                     new THREE.BoxGeometry(0.1, 1.5, 0.1),
@@ -366,8 +539,7 @@ export class Game {
     }
 
     _onResize() {
-        const w = window.innerWidth,
-            h = window.innerHeight;
+        const w = window.innerWidth, h = window.innerHeight;
         this.renderer.setSize(w, h);
         if (this.player?.camera) {
             this.player.camera.aspect = w / h;

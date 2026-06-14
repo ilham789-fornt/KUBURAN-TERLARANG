@@ -23,6 +23,7 @@ export class Ghost {
         this.scene = scene;
         this.isDead = false;
         this.isAttacking = false;
+        this.type = 'HantuBiasa';
 
         // Buat mesh hantu procedural (glowing white figure)
         this.mesh = this._createMesh();
@@ -178,6 +179,7 @@ export class Pocong extends Ghost {
         this._hopTimer = 0;
         this._hopInterval = 0.8;
         this._hopHeight = 0;
+        this.type = 'Pocong';
     }
 
     _createMesh() {
@@ -254,6 +256,7 @@ export class Kuntilanak extends Ghost {
         super(scene, position);
         this.type = 'Kuntilanak';
         this._screamTimer = randomFloat(4, 8);
+        this.type = 'Kuntilanak';
     }
 
     _createMesh() {
@@ -334,6 +337,7 @@ export class Tuyul extends Ghost {
         this.type = 'Tuyul';
         this._zigzagAngle = Math.random() * Math.PI * 2;
         this._zigzagTimer = randomFloat(0.5, 1.5);
+        this.type = 'Tuyul';
     }
 
     _createMesh() {
@@ -407,6 +411,7 @@ export class Kuyang extends Ghost {
         this._diveTimer = randomFloat(3, 6);
         this._isDiving = false;
         this._diveDuration = 0;
+        this.type = 'Kuyang';
     }
 
     _createMesh() {
@@ -588,5 +593,11 @@ export class GhostManager {
 
     challengeEnded() {
         this._activeChallenge = false;
+    }
+
+    setPhase(phase) {
+        if (phase === 1) this._spawnTimer = 30;  // Lambat — pemain bisa eksplorasi
+        if (phase === 2) this._spawnTimer = 15;  // Sedang — mulai menegangkan
+        if (phase === 3) this._spawnTimer = 5;   // Cepat — semua hantu menyerang!
     }
 }
