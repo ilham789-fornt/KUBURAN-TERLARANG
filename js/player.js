@@ -86,7 +86,7 @@ export class Player {
     /**
      * Update player setiap frame.
      * @param {number} delta
-     * @param {Array} obstacles — array THREE.Box3 untuk collision
+     * @param {Array} obstacles — array {x, z, r} cylinder obstacles
      */
     update(delta, obstacles = []) {
         if (this.frozen) return;
@@ -110,11 +110,39 @@ export class Player {
             dir.applyEuler(new THREE.Euler(0, this.yaw, 0));
             const move = dir.clone().multiplyScalar(speed * delta);
 
-            // Cek collision sederhana
-            const newPos = this.body.position.clone().add(move);
-            newPos.y = 0;
-            this.body.position.copy(newPos);
-            this.body.position.y = 0;
+            // ── Collision detection: cylinder vs cylinder ──────────────
+            // Pisahkan sumbu X dan Z agar player bisa sliding di sepanjang dinding
+            const PLAYER_RADIUS = 0.4;
+            const px = this.body.position.x;
+            const pz = this.body.position.z;
+
+            let newX = px + move.x;
+            let newZ = pz + move.z;
+            let blockedX = false;
+            let blockedZ = false;
+
+            for (const obs of obstacles) {
+                const minDist = PLAYER_RADIUS + obs.r;
+
+                // Cek pergerakan pada sumbu X (Z tetap dari posisi sekarang)
+                const dxTest = newX - obs.x;
+                const dzCur  = pz   - obs.z;
+                if (dxTest * dxTest + dzCur * dzCur < minDist * minDist) {
+                    blockedX = true;
+                }
+
+                // Cek pergerakan pada sumbu Z (X tetap dari posisi sekarang)
+                const dxCur  = px   - obs.x;
+                const dzTest = newZ - obs.z;
+                if (dxCur * dxCur + dzTest * dzTest < minDist * minDist) {
+                    blockedZ = true;
+                }
+            }
+
+            if (!blockedX) this.body.position.x = newX;
+            if (!blockedZ) this.body.position.z = newZ;
+            this.body.position.y = 0; // tetap di lantai
+            // ── End collision ──────────────────────────────────────────
 
             // Footstep sound
             this._footTimer -= delta;

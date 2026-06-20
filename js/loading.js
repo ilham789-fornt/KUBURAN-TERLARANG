@@ -1,5 +1,6 @@
 /**
  * loading.js — Loading Screen controller.
+ * Versi terintegrasi dengan preload model 3D nyata.
  */
 
 const TIPS = [
@@ -23,30 +24,46 @@ export class LoadingScreen {
         this._tipInterval = null;
     }
 
-    /** Tampilkan loading screen dan mulai simulasi loading. */
-    show(onComplete) {
+    /**
+     * Tampilkan loading screen dengan preload model 3D nyata.
+     * Progress bar mencerminkan jumlah model yang sudah dimuat.
+     * @param {Function} onComplete - callback dipanggil setelah semua selesai
+     */
+    async show(onComplete) {
         this.screen.style.display = 'flex';
         this._progress = 0;
+        this._updateBar();
         this._showRandomTip();
         this._tipInterval = setInterval(() => this._showRandomTip(), 3000);
 
-        // Simulasi progress loading
-        const step = () => {
-            this._progress += randomProgress();
-            if (this._progress >= 100) {
-                this._progress = 100;
+        try {
+            const { preloadModels } = await import('./modelLoader.js');
+            await preloadModels((loaded, total) => {
+                // 0–90% untuk loading model GLB
+                this._progress = (loaded / total) * 90;
                 this._updateBar();
+            });
+        } catch (err) {
+            console.warn('[LoadingScreen] Gagal preload model, lanjut tanpa model 3D:', err);
+            this._progress = 90;
+            this._updateBar();
+        }
+
+        // 90–100% untuk inisialisasi scene
+        const finish = () => {
+            this._progress = Math.min(100, this._progress + 5);
+            this._updateBar();
+            if (this._progress < 100) {
+                setTimeout(finish, 60);
+            } else {
                 clearInterval(this._tipInterval);
                 setTimeout(() => {
                     this.hide();
                     onComplete?.();
-                }, 800);
-                return;
+                }, 600);
             }
-            this._updateBar();
-            setTimeout(step, 80 + Math.random() * 120);
         };
-        step();
+        finish();
     }
 
     _updateBar() {
@@ -68,8 +85,4 @@ export class LoadingScreen {
             this.screen.style.opacity = '1';
         }, 800);
     }
-}
-
-function randomProgress() {
-    return Math.random() * 8 + 2;
 }

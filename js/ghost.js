@@ -6,11 +6,12 @@
 import * as THREE from 'three';
 import { randomFloat, randomInt } from './utils.js';
 import { audioManager } from './audio.js';
+import { getModel } from './modelLoader.js';
 
 /** Jarak minimum spawn dari player. */
-const SPAWN_MIN_DIST = 20;
+const SPAWN_MIN_DIST = 8;
 /** Jarak spawn maksimum. */
-const SPAWN_MAX_DIST = 40;
+const SPAWN_MAX_DIST = 18;
 /** Jarak trigger challenge (meter). */
 const CHALLENGE_DIST = 5;
 /** Kecepatan gerak hantu normal. */
@@ -25,11 +26,26 @@ export class Ghost {
         this.isAttacking = false;
         this.type = 'HantuBiasa';
 
-        // Buat mesh hantu procedural (glowing white figure)
+        // Buat mesh hantu
         this.mesh = this._createMesh();
         this.mesh.position.copy(position);
-        this.mesh.position.y = 1.5;
+        this.mesh.position.y = 0; // Y diatur oleh update() setiap frame
         scene.add(this.mesh);
+
+        // Cari model dengan animasi di dalam mesh group
+        let animatedModel = null;
+        this.mesh.traverse(child => {
+            if (child.animations && child.animations.length > 0) {
+                animatedModel = child;
+            }
+        });
+
+        if (animatedModel) {
+            this.mixer = new THREE.AnimationMixer(animatedModel);
+            const action = this.mixer.clipAction(animatedModel.animations[0]);
+            action.play();
+            console.log(`[Ghost] Mixer animasi diinisialisasi untuk tipe: ${this.type}`);
+        }
 
         // Animasi melayang
         this._floatOffset = Math.random() * Math.PI * 2;
@@ -46,39 +62,55 @@ export class Ghost {
     _createMesh() {
         const group = new THREE.Group();
 
-        // Body utama — silhouette putih transparan
-        const bodyGeo = new THREE.ConeGeometry(0.5, 2.0, 8);
-        bodyGeo.rotateX(Math.PI); // Kerucut terbalik (seperti pocong)
-        const bodyMat = new THREE.MeshBasicMaterial({
-            color: 0xeeeeff,
-            transparent: true,
-            opacity: 0.75,
-            side: THREE.DoubleSide,
-        });
-        const body = new THREE.Mesh(bodyGeo, bodyMat);
-        body.position.y = 0;
-        group.add(body);
+        // Coba load kuntilanak model sebagai fallback untuk base Ghost class
+        const model = getModel('kuntilanak', 1.8);
+        if (model) {
+            group.add(model);
+        } else {
+            // Tubuh ghostly — terang dan bisa terlihat meski ada fog (fallback prosedural)
+            const bodyMat = new THREE.MeshStandardMaterial({
+                color: 0x8888ff,
+                emissive: new THREE.Color(0x3333aa),
+                emissiveIntensity: 0.8,
+                transparent: true,
+                opacity: 0.85,
+                roughness: 0.3,
+            });
+            const body = new THREE.Mesh(new THREE.ConeGeometry(0.5, 2.0, 8), bodyMat);
+            body.position.y = 1.0;
+            body.castShadow = true;
+            group.add(body);
 
-        // Kepala
-        const headGeo = new THREE.SphereGeometry(0.4, 8, 8);
-        const headMat = new THREE.MeshBasicMaterial({ color: 0xccccdd, transparent: true, opacity: 0.85 });
-        const head = new THREE.Mesh(headGeo, headMat);
-        head.position.y = 1.3;
-        group.add(head);
+            // Kepala
+            const headMat = new THREE.MeshStandardMaterial({
+                color: 0xccccff,
+                emissive: new THREE.Color(0x4444cc),
+                emissiveIntensity: 0.9,
+                transparent: true,
+                opacity: 0.9,
+            });
+            const head = new THREE.Mesh(new THREE.SphereGeometry(0.4, 8, 8), headMat);
+            head.position.y = 2.3;
+            group.add(head);
 
-        // Glow
-        const glowGeo = new THREE.SphereGeometry(0.8, 8, 8);
-        const glowMat = new THREE.MeshBasicMaterial({
-            color: 0x4444ff,
-            transparent: true,
-            opacity: 0.1,
-            side: THREE.BackSide,
-        });
-        group.add(new THREE.Mesh(glowGeo, glowMat));
+            // Mata menyala
+            const eyeMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+            [-0.15, 0.15].forEach(x => {
+                const eye = new THREE.Mesh(new THREE.SphereGeometry(0.07, 6, 6), eyeMat);
+                eye.position.set(x, 2.35, 0.33);
+                group.add(eye);
+            });
+        }
 
-        // Point light hantu
-        const light = new THREE.PointLight(0x3333ff, 1, 10);
-        light.position.y = 1;
+        // Glow sphere — sangat visible
+        const glowMat = new THREE.MeshBasicMaterial({ color: 0x4444ff, transparent: true, opacity: 0.18, side: THREE.BackSide });
+        const glow = new THREE.Mesh(new THREE.SphereGeometry(1.2, 8, 8), glowMat);
+        glow.position.y = 1.0;
+        group.add(glow);
+
+        // Point light lebih terang
+        const light = new THREE.PointLight(0x5555ff, 3.0, 15);
+        light.position.y = 1.5;
         group.add(light);
         this._light = light;
 
@@ -93,6 +125,7 @@ export class Ghost {
      */
     update(delta, playerPos, onChallengeTriggered) {
         if (this.isDead) return;
+        if (this.mixer) this.mixer.update(delta);
 
         const t = Date.now() * 0.001;
 
@@ -140,17 +173,35 @@ export class Ghost {
     /** Efek hantu terusir — cahaya putih lalu menghilang. */
     async banish() {
         this.isDead = true;
-        const mat = this.mesh.children[0]?.material;
-        if (mat) {
-            mat.color.set(0xffffff);
-            mat.emissive?.set(0xffffff);
-        }
-        // Fade out
+
+        // Cari dan salin material dari model GLB agar tidak mempengaruhi instance lain
+        const materials = [];
+        this.mesh.traverse(child => {
+            if (child.isMesh && child.material) {
+                if (Array.isArray(child.material)) {
+                    child.material = child.material.map(m => m.clone());
+                    materials.push(...child.material);
+                } else {
+                    child.material = child.material.clone();
+                    materials.push(child.material);
+                }
+            }
+        });
+
+        // Buat material bersinar putih terang
+        materials.forEach(mat => {
+            if (mat.color) mat.color.set(0xffffff);
+            if (mat.emissive) mat.emissive.set(0xffffff);
+            if (mat.emissiveIntensity !== undefined) mat.emissiveIntensity = 2.0;
+        });
+
+        // Fade out bertahap
         let alpha = 1;
         const fade = () => {
             alpha -= 0.05;
-            this.mesh.children.forEach(c => {
-                if (c.material) c.material.opacity = Math.max(0, c.material.opacity - 0.05);
+            materials.forEach(mat => {
+                mat.transparent = true;
+                mat.opacity = Math.max(0, alpha);
             });
             if (alpha > 0) requestAnimationFrame(fade);
             else this.scene.remove(this.mesh);
@@ -185,39 +236,41 @@ export class Pocong extends Ghost {
     _createMesh() {
         const group = new THREE.Group();
 
-        // Tubuh terbungkus kain (silinder)
-        const bodyGeo = new THREE.CylinderGeometry(0.3, 0.35, 1.8, 8);
-        const bodyMat = new THREE.MeshBasicMaterial({ color: 0xdddde8, transparent: true, opacity: 0.9 });
-        const body = new THREE.Mesh(bodyGeo, bodyMat);
-        body.position.y = 0;
-        group.add(body);
+        const model = getModel('pocong', 1.8);
+        if (model) {
+            group.add(model);
+        } else {
+            // Fallback terang: bungkusan kain putih bercahaya
+            const mat = new THREE.MeshStandardMaterial({
+                color: 0xeeeeee,
+                emissive: new THREE.Color(0x888888),
+                emissiveIntensity: 0.6,
+                transparent: true, opacity: 0.92,
+            });
+            const body = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.35, 1.8, 8), mat);
+            body.position.y = 0;
+            group.add(body);
+            const head = new THREE.Mesh(new THREE.SphereGeometry(0.35, 8, 8), mat);
+            head.position.y = 0;
+            group.add(head);
+        }
 
-        // Kepala membulat di atas
-        const headGeo = new THREE.SphereGeometry(0.35, 8, 8);
-        const headMat = new THREE.MeshBasicMaterial({ color: 0xe8e8ee, transparent: true, opacity: 0.95 });
-        const head = new THREE.Mesh(headGeo, headMat);
-        head.position.y = 1.2;
-        group.add(head);
+        // Glow hijau terang
+        // const glowMat = new THREE.MeshBasicMaterial({ color: 0x00ff88, transparent: true, opacity: 0.15, side: THREE.BackSide });
+        // const glow = new THREE.Mesh(new THREE.SphereGeometry(1.2, 8, 8), glowMat);
+        // glow.position.y = 1.0;
+        // group.add(glow);
 
-        // Ikatan kain di atas kepala
-        const topGeo = new THREE.ConeGeometry(0.15, 0.4, 6);
-        const top = new THREE.Mesh(topGeo, bodyMat);
-        top.position.y = 1.6;
-        group.add(top);
-
-        // Glow hijau seram
-        const glowMat = new THREE.MeshBasicMaterial({ color: 0x00ff44, transparent: true, opacity: 0.08, side: THREE.BackSide });
-        group.add(new THREE.Mesh(new THREE.SphereGeometry(0.9, 8, 8), glowMat));
-
-        const light = new THREE.PointLight(0x88ffaa, 1.2, 8);
-        light.position.y = 1;
-        group.add(light);
-        this._light = light;
-        return group;
+        // const light = new THREE.PointLight(0x44ff88, 2.5, 12);
+        // light.position.y = 1;
+        // group.add(light);
+        // this._light = light;
+        // return group;
     }
 
     update(delta, playerPos, onChallengeTriggered) {
         if (this.isDead) return;
+        if (this.mixer) this.mixer.update(delta);
         const t = Date.now() * 0.001;
 
         // Animasi loncat
@@ -262,50 +315,75 @@ export class Kuntilanak extends Ghost {
     _createMesh() {
         const group = new THREE.Group();
 
-        // Gaun panjang
-        const dressGeo = new THREE.ConeGeometry(0.5, 2.2, 8);
-        dressGeo.rotateX(Math.PI);
-        const dressMat = new THREE.MeshBasicMaterial({ color: 0xfff0f5, transparent: true, opacity: 0.8 });
-        group.add(new THREE.Mesh(dressGeo, dressMat));
-
-        // Kepala
-        const headGeo = new THREE.SphereGeometry(0.38, 8, 8);
-        const headMat = new THREE.MeshBasicMaterial({ color: 0xffe0e8, transparent: true, opacity: 0.9 });
-        const head = new THREE.Mesh(headGeo, headMat);
-        head.position.y = 1.4;
-        group.add(head);
-
-        // Rambut panjang (beberapa silinder tipis)
-        const hairMat = new THREE.MeshBasicMaterial({ color: 0x111111, transparent: true, opacity: 0.85 });
-        for (let i = 0; i < 6; i++) {
-            const strand = new THREE.Mesh(
-                new THREE.CylinderGeometry(0.02, 0.03, 1.5 + Math.random() * 0.5, 4),
-                hairMat
-            );
-            const angle = (i / 6) * Math.PI * 2;
-            strand.position.set(Math.cos(angle) * 0.25, 0.8, Math.sin(angle) * 0.25);
-            strand.rotation.z = (Math.random() - 0.5) * 0.4;
-            group.add(strand);
+        // kuntilanak_ghost.glb sangat kecil (2cm!) → selalu pakai fallback
+        // tapi bisa coba load model, jika ada dan ukuran wajar gunakan
+        const model = getModel('kuntilanak', 2.0);
+        if (model) {
+            group.add(model);
+        } else {
+            // Wanita putih bercahaya — sangat visible
+            const skinMat = new THREE.MeshStandardMaterial({
+                color: 0xddd8d0,
+                emissive: new THREE.Color(0x554422),
+                emissiveIntensity: 0.5,
+                transparent: true, opacity: 0.95,
+                roughness: 0.8,
+            });
+            const dressMat = new THREE.MeshStandardMaterial({
+                color: 0xf0ece8,
+                emissive: new THREE.Color(0x332211),
+                emissiveIntensity: 0.4,
+                transparent: true, opacity: 0.9,
+                roughness: 0.9, side: THREE.DoubleSide,
+            });
+            // Gaun
+            const dress = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.55, 2.1, 10), dressMat);
+            dress.position.y = 1.05;
+            group.add(dress);
+            // Kepala
+            const head = new THREE.Mesh(new THREE.SphereGeometry(0.36, 12, 10), skinMat);
+            head.position.y = 2.4;
+            group.add(head);
+            // Rambut — helai panjang hitam
+            const hairMat = new THREE.MeshBasicMaterial({ color: 0x050808 });
+            for (let i = 0; i < 8; i++) {
+                const strand = new THREE.Mesh(
+                    new THREE.CylinderGeometry(0.01, 0.015, 1.8, 4),
+                    hairMat
+                );
+                const a = (i / 8) * Math.PI * 2;
+                strand.position.set(Math.sin(a) * 0.2, 2.4 - 0.9, Math.cos(a) * 0.2);
+                strand.rotation.z = Math.sin(a) * 0.3;
+                group.add(strand);
+            }
         }
 
-        // Glow merah muda
-        const glowMat = new THREE.MeshBasicMaterial({ color: 0xff88aa, transparent: true, opacity: 0.1, side: THREE.BackSide });
-        group.add(new THREE.Mesh(new THREE.SphereGeometry(1.0, 8, 8), glowMat));
+        // Glow hijau pucat ghostly
+        // const glowMat = new THREE.MeshBasicMaterial({ color: 0xaaffcc, transparent: true, opacity: 0.18, side: THREE.BackSide });
+        // const glow = new THREE.Mesh(new THREE.SphereGeometry(1.4, 8, 8), glowMat);
+        // glow.position.y = 1.2;
+        // group.add(glow);
 
-        const light = new THREE.PointLight(0xff4477, 1.5, 12);
-        light.position.y = 1;
-        group.add(light);
-        this._light = light;
-        return group;
+        // const light = new THREE.PointLight(0x88ffbb, 3.0, 16);
+        // light.position.y = 1.5;
+        // group.add(light);
+        // this._light = light;
+        // return group;
     }
 
     update(delta, playerPos, onChallengeTriggered) {
         if (this.isDead) return;
+        if (this.mixer) this.mixer.update(delta);
         const t = Date.now() * 0.001;
 
-        // Melayang lebih tinggi dan bergoyang
-        this.mesh.position.y = 1.8 + Math.sin(t * 2 + this._floatOffset) * 0.5;
-        this.mesh.rotation.y += 1.5 * delta;
+        // Melayang halus — naik turun sedikit agar terasa melayang
+        this.mesh.position.y = 0.1 + Math.sin(t * 1.8 + this._floatOffset) * 0.25;
+
+        // Hadap ke arah player (lookAt di XZ plane)
+        const flatPlayer = new THREE.Vector3(playerPos.x, this.mesh.position.y, playerPos.z);
+        this.mesh.lookAt(flatPlayer);
+        // Sway sedikit seperti melayang
+        this.mesh.rotation.z = Math.sin(t * 1.2) * 0.04;
 
         const distToPlayer = this.mesh.position.distanceTo(playerPos);
         if (distToPlayer < CHALLENGE_DIST) { onChallengeTriggered?.(this); return; }
@@ -324,7 +402,8 @@ export class Kuntilanak extends Ghost {
             this._screamTimer = randomFloat(5, 10);
         }
 
-        if (this._light) this._light.intensity = 1.2 + Math.sin(t * 8) * 0.5;
+        // Flicker cahaya halus
+        if (this._light) this._light.intensity = 1.6 + Math.sin(t * 6) * 0.4;
     }
 }
 
@@ -343,31 +422,41 @@ export class Tuyul extends Ghost {
     _createMesh() {
         const group = new THREE.Group();
 
-        // Tubuh kecil seperti anak kecil
-        const bodyGeo = new THREE.CapsuleGeometry(0.2, 0.5, 4, 8);
-        const bodyMat = new THREE.MeshBasicMaterial({ color: 0xaaccaa, transparent: true, opacity: 0.85 });
-        group.add(new THREE.Mesh(bodyGeo, bodyMat));
+        const model = getModel('tuyul', 1.0);
+        if (model) {
+            group.add(model);
+        } else {
+            // Tuyul prosedural: makhluk kecil hijau bercahaya
+            const mat = new THREE.MeshStandardMaterial({
+                color: 0x88cc88,
+                emissive: new THREE.Color(0x224422),
+                emissiveIntensity: 0.7,
+                transparent: true, opacity: 0.9,
+            });
+            const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.22, 0.45, 4, 8), mat);
+            body.position.y = 0.5;
+            group.add(body);
+            const head = new THREE.Mesh(new THREE.SphereGeometry(0.3, 8, 8), mat);
+            head.position.y = 1.05;
+            group.add(head);
+        }
 
-        // Kepala besar (proporsional anak kecil)
-        const headGeo = new THREE.SphereGeometry(0.28, 8, 8);
-        const headMat = new THREE.MeshBasicMaterial({ color: 0x99bb99, transparent: true, opacity: 0.9 });
-        const head = new THREE.Mesh(headGeo, headMat);
-        head.position.y = 0.7;
-        group.add(head);
-
-        // Mata menyala
+        // Mata merah menyala — koordinat tinggi model ~1.0m
         const eyeMat = new THREE.MeshBasicMaterial({ color: 0xff0000 });
-        [-0.1, 0.1].forEach(x => {
-            const eye = new THREE.Mesh(new THREE.SphereGeometry(0.05, 6, 6), eyeMat);
-            eye.position.set(x, 0.72, 0.22);
+        [-0.12, 0.12].forEach(x => {
+            const eye = new THREE.Mesh(new THREE.SphereGeometry(0.06, 6, 6), eyeMat);
+            eye.position.set(x, 1.05, 0.26);
             group.add(eye);
         });
 
-        // Glow hijau gelap
-        const glowMat = new THREE.MeshBasicMaterial({ color: 0x33ff33, transparent: true, opacity: 0.12, side: THREE.BackSide });
-        group.add(new THREE.Mesh(new THREE.SphereGeometry(0.6, 8, 8), glowMat));
+        // Glow hijau terang
+        const glowMat = new THREE.MeshBasicMaterial({ color: 0x44ff44, transparent: true, opacity: 0.20, side: THREE.BackSide });
+        const glow = new THREE.Mesh(new THREE.SphereGeometry(0.85, 8, 8), glowMat);
+        glow.position.y = 0.5;
+        group.add(glow);
 
-        const light = new THREE.PointLight(0x44ff44, 0.8, 6);
+        const light = new THREE.PointLight(0x44ff44, 2.5, 10);
+        light.position.y = 0.6;
         group.add(light);
         this._light = light;
         return group;
@@ -375,6 +464,7 @@ export class Tuyul extends Ghost {
 
     update(delta, playerPos, onChallengeTriggered) {
         if (this.isDead) return;
+        if (this.mixer) this.mixer.update(delta);
         const t = Date.now() * 0.001;
 
         // Animasi berlari (naik turun)
@@ -417,54 +507,62 @@ export class Kuyang extends Ghost {
     _createMesh() {
         const group = new THREE.Group();
 
-        // Kepala
-        const headGeo = new THREE.SphereGeometry(0.45, 10, 10);
-        const headMat = new THREE.MeshBasicMaterial({ color: 0xcc9966, transparent: true, opacity: 0.92 });
-        const head = new THREE.Mesh(headGeo, headMat);
-        group.add(head);
+        const model = getModel('kuyang', 1.2);
+        if (model) {
+            group.add(model);
+        } else {
+            // Kuyang: kepala mengambang dengan organ — merah menyala
+            const headMat = new THREE.MeshStandardMaterial({
+                color: 0xcc8855,
+                emissive: new THREE.Color(0x441100),
+                emissiveIntensity: 0.6,
+                transparent: true, opacity: 0.95,
+                roughness: 0.7,
+            });
+            const head = new THREE.Mesh(new THREE.SphereGeometry(0.5, 12, 10), headMat);
+            head.position.y = 0.6;
+            group.add(head);
 
-        // Rambut
-        const hairMat = new THREE.MeshBasicMaterial({ color: 0x0a0505, transparent: true, opacity: 0.9 });
-        for (let i = 0; i < 8; i++) {
-            const strand = new THREE.Mesh(
-                new THREE.CylinderGeometry(0.015, 0.025, 1.0 + Math.random(), 4),
-                hairMat
-            );
-            const angle = (i / 8) * Math.PI * 2;
-            strand.position.set(Math.cos(angle) * 0.3, -0.3, Math.sin(angle) * 0.3);
-            strand.rotation.z = Math.cos(angle) * 0.5;
-            strand.rotation.x = Math.sin(angle) * 0.5;
-            group.add(strand);
+            // Rambut
+            const hairMat = new THREE.MeshBasicMaterial({ color: 0x050505 });
+            for (let i = 0; i < 6; i++) {
+                const s = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.02, 1.4, 4), hairMat);
+                const a = (i / 6) * Math.PI * 2;
+                s.position.set(Math.sin(a) * 0.28, 0.6 - 0.7, Math.cos(a) * 0.28);
+                s.rotation.z = Math.sin(a) * 0.5;
+                group.add(s);
+            }
+
+            // Organ menggantung merah
+            const organMat = new THREE.MeshStandardMaterial({
+                color: 0xaa0011,
+                emissive: new THREE.Color(0x550005),
+                emissiveIntensity: 0.5,
+                transparent: true, opacity: 0.88,
+            });
+            for (let i = 0; i < 5; i++) {
+                const org = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.025, 0.9 + Math.random() * 0.5, 4), organMat);
+                org.position.set((Math.random() - 0.5) * 0.5, 0.1 - Math.random() * 0.3, (Math.random() - 0.5) * 0.5);
+                group.add(org);
+            }
         }
 
-        // Organ menggantung (tali-tali merah)
-        const organMat = new THREE.MeshBasicMaterial({ color: 0x880011, transparent: true, opacity: 0.8 });
-        for (let i = 0; i < 5; i++) {
-            const organ = new THREE.Mesh(
-                new THREE.CylinderGeometry(0.04, 0.02, 0.8 + Math.random() * 0.6, 4),
-                organMat
-            );
-            organ.position.set(
-                (Math.random() - 0.5) * 0.5,
-                -0.6 - Math.random() * 0.3,
-                (Math.random() - 0.5) * 0.5
-            );
-            group.add(organ);
-        }
-
-        // Mata menyala merah
+        // Mata merah menyala
         const eyeMat = new THREE.MeshBasicMaterial({ color: 0xff2200 });
-        [-0.18, 0.18].forEach(x => {
-            const eye = new THREE.Mesh(new THREE.SphereGeometry(0.07, 6, 6), eyeMat);
-            eye.position.set(x, 0.05, 0.38);
+        [-0.2, 0.2].forEach(x => {
+            const eye = new THREE.Mesh(new THREE.SphereGeometry(0.09, 6, 6), eyeMat);
+            eye.position.set(x, 0.7, 0.44);
             group.add(eye);
         });
 
-        // Glow oranye-merah
-        const glowMat = new THREE.MeshBasicMaterial({ color: 0xff4400, transparent: true, opacity: 0.12, side: THREE.BackSide });
-        group.add(new THREE.Mesh(new THREE.SphereGeometry(0.8, 8, 8), glowMat));
+        // Glow oranye-merah terang
+        const glowMat = new THREE.MeshBasicMaterial({ color: 0xff5500, transparent: true, opacity: 0.22, side: THREE.BackSide });
+        const glow = new THREE.Mesh(new THREE.SphereGeometry(1.1, 8, 8), glowMat);
+        glow.position.y = 0.6;
+        group.add(glow);
 
-        const light = new THREE.PointLight(0xff3300, 2, 10);
+        const light = new THREE.PointLight(0xff3300, 3.5, 14);
+        light.position.y = 0.6;
         group.add(light);
         this._light = light;
         return group;
@@ -472,6 +570,7 @@ export class Kuyang extends Ghost {
 
     update(delta, playerPos, onChallengeTriggered) {
         if (this.isDead) return;
+        if (this.mixer) this.mixer.update(delta);
         const t = Date.now() * 0.001;
 
         const distToPlayer = this.mesh.position.distanceTo(playerPos);
@@ -525,13 +624,12 @@ export class GhostManager {
         this._spawnTimer = randomInt(20, 40);
         this._activeChallenge = false;
 
-        // Daftar semua tipe hantu beserta bobotnya (semakin tinggi = lebih sering muncul)
+        // Daftar semua tipe hantu beserta bobotnya (hanya memuat tipe dengan model GLB asli)
         this._ghostTypes = [
-            { Class: Ghost, weight: 2, label: 'Hantu Biasa' },
             { Class: Pocong, weight: 3, label: 'Pocong' },
-            { Class: Kuntilanak, weight: 2, label: 'Kuntilanak' },
+            { Class: Kuntilanak, weight: 3, label: 'Kuntilanak' },
             { Class: Tuyul, weight: 2, label: 'Tuyul' },
-            { Class: Kuyang, weight: 1, label: 'Kuyang' }, // Paling langka
+            { Class: Kuyang, weight: 2, label: 'Kuyang' },
         ];
     }
 

@@ -1,308 +1,80 @@
 /**
- * mission.js — Sistem Misi Bertahap
- * Fase 1: Nyalakan lilin → Fase 2: Kumpulkan jimat → Fase 3: Ritual altar
+ * mission.js — Sistem Misi & Objektif
+ * Tantangan 1: Misi bervariasi setiap sesi bermain.
  */
 
-import * as THREE from 'three';
-import { audioManager } from './audio.js';
+export const MISSION_TYPES = {
+    EXORCISE: 'exorcise',   // Usir X hantu
+    CANDLE: 'candle',     // Nyalakan X lilin
+    SURVIVE: 'survive',    // Bertahan X detik tanpa disentuh
+    COLLECT: 'collect',    // Kumpulkan X jimat
+    PERFECT: 'perfect',    // Usir hantu dengan akurasi 90%+
+};
 
-// ============================================================
-// FASE 1 — Lilin Ritual
-// ============================================================
-export class CandleSystem {
-    constructor(scene, count = 3) {
-        this.scene = scene;
-        this.candles = [];
-        this.lit = 0;
-        this.total = count;
-        this._spawn(count);
-    }
+/**
+ * Template misi yang bisa muncul.
+ * difficulty: 1 (mudah) — 3 (sulit)
+ */
+const MISSION_TEMPLATES = [
+    { id: 'ex5', type: MISSION_TYPES.EXORCISE, target: 5, label: 'Usir 5 Hantu', reward: 300, difficulty: 1 },
+    { id: 'ex10', type: MISSION_TYPES.EXORCISE, target: 10, label: 'Usir 10 Hantu', reward: 800, difficulty: 2 },
+    { id: 'sv60', type: MISSION_TYPES.SURVIVE, target: 60, label: 'Bertahan 60 Detik', reward: 200, difficulty: 1 },
+    { id: 'sv180', type: MISSION_TYPES.SURVIVE, target: 180, label: 'Bertahan 3 Menit', reward: 500, difficulty: 2 },
+    { id: 'ca3', type: MISSION_TYPES.CANDLE, target: 3, label: 'Nyalakan 3 Lilin', reward: 250, difficulty: 1 },
+    { id: 'ca6', type: MISSION_TYPES.CANDLE, target: 6, label: 'Nyalakan 6 Lilin', reward: 500, difficulty: 2 },
+    { id: 'co3', type: MISSION_TYPES.COLLECT, target: 3, label: 'Kumpulkan 3 Jimat', reward: 350, difficulty: 1 },
+    { id: 'pf2', type: MISSION_TYPES.PERFECT, target: 2, label: 'Usir 2 Hantu (akurasi 90%)', reward: 400, difficulty: 2 },
+    { id: 'pf5', type: MISSION_TYPES.PERFECT, target: 5, label: 'Usir 5 Hantu (akurasi 90%)', reward: 900, difficulty: 3 },
+];
 
-    _spawn(count) {
-        const positions = [
-            new THREE.Vector3(-15, 0, -20),
-            new THREE.Vector3(20, 0, 10),
-            new THREE.Vector3(-5, 0, 25),
-            new THREE.Vector3(18, 0, -18),
-            new THREE.Vector3(-22, 0, 5),
-        ].slice(0, count);
-
-        positions.forEach((pos, i) => {
-            const candle = this._makeCandle(pos);
-            this.candles.push({ mesh: candle, isLit: false, position: pos });
-            this.scene.add(candle);
-        });
-    }
-
-    _makeCandle(pos) {
-        const group = new THREE.Group();
-
-        // Batang lilin
-        const body = new THREE.Mesh(
-            new THREE.CylinderGeometry(0.08, 0.1, 0.6, 8),
-            new THREE.MeshLambertMaterial({ color: 0xfff5cc })
-        );
-        body.position.y = 0.3;
-        group.add(body);
-
-        // Api (belum menyala — warna gelap)
-        const flame = new THREE.Mesh(
-            new THREE.SphereGeometry(0.07, 6, 6),
-            new THREE.MeshBasicMaterial({ color: 0x333333 })
-        );
-        flame.position.y = 0.68;
-        flame.name = 'flame';
-        group.add(flame);
-
-        // Marker glow (indikator bisa diinteraksi)
-        const glow = new THREE.Mesh(
-            new THREE.SphereGeometry(0.5, 8, 8),
-            new THREE.MeshBasicMaterial({
-                color: 0xffaa00,
-                transparent: true,
-                opacity: 0.15,
-                side: THREE.BackSide,
-            })
-        );
-        glow.name = 'glow';
-        group.add(glow);
-
-        group.position.copy(pos);
-        group.position.y = 0;
-        return group;
+export class MissionSystem {
+    constructor() {
+        /** @type {Array<{template: object, progress: number, completed: boolean}>} */
+        this.activeMissions = [];
+        this._onComplete = null;
     }
 
     /**
-     * Cek apakah pemain dekat lilin yang belum dinyalakan.
-     * @param {THREE.Vector3} playerPos
-     * @returns {object|null} candle yang bisa dinyalakan
+     * Pilih 3 misi acak (1 mudah, 1 sedang, 1 sulit) untuk sesi ini.
+     * @param {(mission: object, bonus: number) => void} onComplete
      */
-    getNearbyUnlit(playerPos) {
-        return this.candles.find(c =>
-            !c.isLit &&
-            c.position.distanceTo(playerPos) < 2.5
-        ) || null;
+    init(onComplete) {
+        this._onComplete = onComplete;
+        const easy = this._pickRandom(MISSION_TEMPLATES.filter(m => m.difficulty === 1));
+        const medium = this._pickRandom(MISSION_TEMPLATES.filter(m => m.difficulty === 2));
+        const hard = this._pickRandom(MISSION_TEMPLATES.filter(m => m.difficulty === 3));
+
+        this.activeMissions = [easy, medium, hard]
+            .filter(Boolean)
+            .map(t => ({ template: t, progress: 0, completed: false }));
     }
 
-    /**
-     * Nyalakan lilin.
-     * @param {object} candle
-     */
-    lightCandle(candle) {
-        candle.isLit = true;
-        this.lit++;
-
-        // Update visual — api menyala
-        const flame = candle.mesh.getObjectByName('flame');
-        if (flame) {
-            flame.material.color.set(0xff8800);
-        }
-
-        // Tambah point light (cahaya api)
-        const light = new THREE.PointLight(0xff6600, 1.5, 5);
-        light.position.set(0, 0.7, 0);
-        candle.mesh.add(light);
-
-        // Hapus glow marker
-        const glow = candle.mesh.getObjectByName('glow');
-        if (glow) candle.mesh.remove(glow);
-
-        audioManager.play('flashlight'); // Pakai suara klik sebagai placeholder
+    _pickRandom(arr) {
+        if (!arr.length) return null;
+        return arr[Math.floor(Math.random() * arr.length)];
     }
 
-    isComplete() {
-        return this.lit >= this.total;
-    }
-
-    /** Animasi api berkedip setiap frame. */
-    update(delta) {
-        const t = Date.now() * 0.003;
-        this.candles.forEach((c, i) => {
-            if (!c.isLit) return;
-            const flame = c.mesh.getObjectByName('flame');
-            if (flame) {
-                flame.scale.setScalar(0.9 + Math.sin(t * 3 + i) * 0.15);
-                flame.position.y = 0.68 + Math.sin(t * 5 + i) * 0.03;
+    /** Catat event game ke sistem misi. */
+    recordEvent(type, value = 1) {
+        this.activeMissions.forEach(m => {
+            if (m.completed) return;
+            if (m.template.type === type) {
+                m.progress = Math.min(m.template.target, m.progress + value);
+                if (m.progress >= m.template.target) {
+                    m.completed = true;
+                    this._onComplete?.(m.template, m.template.reward);
+                }
             }
         });
     }
-}
 
-// ============================================================
-// FASE 2 — Fragmen Jimat
-// ============================================================
-export class FragmentSystem {
-    constructor(scene, count = 3) {
-        this.scene = scene;
-        this.fragments = [];
-        this.collected = 0;
-        this.total = count;
-        this._spawn(count);
+    /** Khusus perfect exorcise: hanya hitung jika akurasi >= 90. */
+    recordExorcise(accuracy) {
+        this.recordEvent(MISSION_TYPES.EXORCISE, 1);
+        if (accuracy >= 90) {
+            this.recordEvent(MISSION_TYPES.PERFECT, 1);
+        }
     }
 
-    _spawn(count) {
-        const positions = [
-            new THREE.Vector3(10, 0, -15),
-            new THREE.Vector3(-18, 0, -8),
-            new THREE.Vector3(5, 0, 20),
-            new THREE.Vector3(-10, 0, 15),
-            new THREE.Vector3(22, 0, -5),
-        ].slice(0, count);
-
-        positions.forEach(pos => {
-            const mesh = this._makeFragment(pos);
-            this.fragments.push({ mesh, collected: false, position: pos.clone() });
-            this.scene.add(mesh);
-        });
-    }
-
-    _makeFragment(pos) {
-        const group = new THREE.Group();
-
-        // Berlian berkilau
-        const gem = new THREE.Mesh(
-            new THREE.OctahedronGeometry(0.25),
-            new THREE.MeshBasicMaterial({
-                color: 0x00ffcc,
-                transparent: true,
-                opacity: 0.85,
-                wireframe: false,
-            })
-        );
-        gem.name = 'gem';
-        group.add(gem);
-
-        // Glow
-        const glow = new THREE.Mesh(
-            new THREE.SphereGeometry(0.5, 8, 8),
-            new THREE.MeshBasicMaterial({
-                color: 0x00ffcc,
-                transparent: true,
-                opacity: 0.12,
-                side: THREE.BackSide,
-            })
-        );
-        group.add(glow);
-
-        // Cahaya
-        const light = new THREE.PointLight(0x00ffcc, 1, 6);
-        group.add(light);
-
-        group.position.copy(pos);
-        group.position.y = 0.8;
-        return group;
-    }
-
-    /**
-     * Cek apakah pemain dekat fragmen.
-     * @param {THREE.Vector3} playerPos
-     */
-    getNearbyUncollected(playerPos) {
-        return this.fragments.find(f =>
-            !f.collected &&
-            f.position.distanceTo(new THREE.Vector3(playerPos.x, 0, playerPos.z)) < 2.0
-        ) || null;
-    }
-
-    collect(fragment) {
-        fragment.collected = true;
-        this.collected++;
-        this.scene.remove(fragment.mesh);
-        audioManager.play('ui_click');
-    }
-
-    isComplete() {
-        return this.collected >= this.total;
-    }
-
-    update(delta) {
-        const t = Date.now() * 0.001;
-        this.fragments.forEach((f, i) => {
-            if (f.collected) return;
-            // Mengambang & berputar
-            f.mesh.position.y = 0.8 + Math.sin(t * 2 + i) * 0.2;
-            f.mesh.rotation.y += delta * 1.5;
-        });
-    }
-}
-
-// ============================================================
-// FASE 3 — Altar Ritual
-// ============================================================
-export class AltarSystem {
-    constructor(scene) {
-        this.scene = scene;
-        this.isActive = false;
-        this.position = new THREE.Vector3(0, 0, 0); // Tengah kuburan
-        this._mesh = this._makeAltar();
-        scene.add(this._mesh);
-    }
-
-    _makeAltar() {
-        const group = new THREE.Group();
-
-        // Batu altar
-        const base = new THREE.Mesh(
-            new THREE.BoxGeometry(2, 0.3, 1.5),
-            new THREE.MeshLambertMaterial({ color: 0x222230 })
-        );
-        base.position.y = 0.15;
-        group.add(base);
-
-        // Permukaan altar
-        const top = new THREE.Mesh(
-            new THREE.BoxGeometry(1.8, 0.1, 1.3),
-            new THREE.MeshLambertMaterial({ color: 0x333345 })
-        );
-        top.position.y = 0.35;
-        group.add(top);
-
-        // Simbol altar (glow circle di tanah)
-        const circle = new THREE.Mesh(
-            new THREE.CircleGeometry(2.5, 32),
-            new THREE.MeshBasicMaterial({
-                color: 0x8800ff,
-                transparent: true,
-                opacity: 0.08,
-                side: THREE.DoubleSide,
-            })
-        );
-        circle.rotation.x = -Math.PI / 2;
-        circle.position.y = 0.01;
-        circle.name = 'circle';
-        group.add(circle);
-
-        // Cahaya ungu (tidak aktif dulu)
-        const light = new THREE.PointLight(0x6600ff, 0, 8);
-        light.name = 'light';
-        group.add(light);
-
-        group.position.copy(this.position);
-        return group;
-    }
-
-    /**
-     * Aktifkan altar (setelah fase 1 & 2 selesai).
-     */
-    activate() {
-        this.isActive = true;
-        const light = this._mesh.getObjectByName('light');
-        if (light) light.intensity = 2;
-        const circle = this._mesh.getObjectByName('circle');
-        if (circle) circle.material.opacity = 0.25;
-        audioManager.play('whisper');
-    }
-
-    isPlayerNear(playerPos) {
-        return this.isActive &&
-            this.position.distanceTo(new THREE.Vector3(playerPos.x, 0, playerPos.z)) < 3.0;
-    }
-
-    update(delta) {
-        if (!this.isActive) return;
-        const t = Date.now() * 0.001;
-        const light = this._mesh.getObjectByName('light');
-        if (light) light.intensity = 1.5 + Math.sin(t * 3) * 0.8;
-        this._mesh.rotation.y += delta * 0.3;
-    }
+    getMissions() { return this.activeMissions; }
 }

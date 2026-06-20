@@ -40,11 +40,19 @@ export class JumpscareSystem {
         const imgSrc = JUMPSCARE_IMAGES[ghostType] || JUMPSCARE_IMAGES['default'];
         this.imgEl.style.backgroundImage = `url('${imgSrc}')`;
 
-        // Tampilkan overlay
+        // ✅ Reset animasi CSS agar jumpscareZoom diputar ulang setiap kali trigger dipanggil
+        this.imgEl.style.animation = 'none';
+        // Paksa reflow browser agar reset animasi benar-benar terjadi
+        void this.imgEl.offsetWidth;
+        this.imgEl.style.animation = '';
+
+        // ✅ Tampilkan overlay dengan paksa (override .hidden)
         this.el.classList.remove('hidden');
+        this.el.style.display = 'flex';
+        this.el.style.zIndex = '9999';
         document.body.classList.add('shake');
 
-        // ✅ Baris sound ada DI DALAM trigger(), bukan di luar!
+        // ✅ Sound dipanggil di dalam trigger()
         const soundId = JUMPSCARE_SOUNDS[ghostType] || JUMPSCARE_SOUNDS['default'];
         audioManager.play(soundId);
 
@@ -52,6 +60,8 @@ export class JumpscareSystem {
 
         setTimeout(() => {
             this.el.classList.add('hidden');
+            this.el.style.display = '';
+            this.el.style.zIndex = '';
             this._onDone?.();
         }, 2500);
     }

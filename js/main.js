@@ -39,9 +39,10 @@ async function init() {
     _bindVictoryButtons();
     // _bindTutorial();
 
-    // Sembunyikan loading awal, tampilkan main menu
-    document.getElementById('loading-screen').style.display = 'none';
-    mainMenu.show();
+    // Preload semua model 3D di loading screen awal, lalu tampilkan menu
+    await loadingScreen.show(() => {
+        mainMenu.show();
+    });
 }
 
 // ========================
@@ -60,9 +61,8 @@ function _bindMenuButtons() {
     document.getElementById('btn-play').addEventListener('click', () => {
         mainMenu.hide();
         audioManager.stopAmbience();
-        loadingScreen.show(() => {
-            currentGame.start();
-        });
+        // Model sudah di-cache, show hanya animasi 90->100% lalu langsung start
+        currentGame.start();
     });
 
     // OPTIONS (dari main menu)
@@ -133,10 +133,8 @@ function _bindPauseButtons() {
 function _bindGameOverButtons() {
     document.getElementById('btn-restart').addEventListener('click', () => {
         currentGame.ui.hideGameOver();
-        loadingScreen.show(() => {
-            currentGame = new Game();
-            currentGame.start();
-        });
+        currentGame = new Game();
+        currentGame.start();
     });
 
     document.getElementById('btn-go-main').addEventListener('click', () => {
@@ -153,10 +151,8 @@ function _bindVictoryButtons() {
 
     document.getElementById('btn-play-again').addEventListener('click', () => {
         currentGame.ui.hideVictory();
-        loadingScreen.show(() => {
-            currentGame = new Game();
-            currentGame.start();
-        });
+        currentGame = new Game();
+        currentGame.start();
     });
 }
 

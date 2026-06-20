@@ -1,16 +1,75 @@
 /**
  * voice.js — Web Speech API + similarity engine.
+ * Tantangan 2: Variasi kesulitan bacaan berdasarkan progress pemain.
  */
 
 import { calculateSimilarity } from './utils.js';
 
-/** Target bacaan challenge. */
-export const CHALLENGE_TEXTS = [
-    "A'udzu billahi minasy syaithanir rajim",
+// ============================================================
+// TANTANGAN 2: Bacaan dibagi 3 level kesulitan
+// ============================================================
+
+/** Level 1 (mudah) — pendek, 1-3 kata kunci */
+const TEXTS_EASY = [
+    "Allahu Akbar",
+    "Bismillah",
+    "La ilaha illallah",
+    "Astaghfirullah",
+];
+
+/** Level 2 (sedang) — kalimat standar */
+const TEXTS_MEDIUM = [
     "Bismillahirrahmanirrahim",
     "La haula wala quwwata illa billah",
-    "Allahu Akbar",
+    "Subhanallahi wa bihamdihi",
+    "Allahu Akbar Walillahilhamd",
 ];
+
+/** Level 3 (sulit) — kalimat panjang */
+const TEXTS_HARD = [
+    "A'udzu billahi minasy syaithanir rajim",
+    "Laa ilaaha illallaahu wahdahu laa syariika lahu",
+    "Bismillahi tawakkaltu alallahi wala hawla wala quwwata illa billah",
+    "Rabbighfir lii warhamnii wa'aafinii warzuqnii",
+];
+
+/**
+ * Pilih teks challenge berdasarkan jumlah hantu yang sudah diusir.
+ * @param {number} ghostsKilled
+ * @returns  text: string, timeLimit: number, chainCount: number 
+ */
+export function pickChallengeConfig(ghostsKilled) {
+    let pool, timeLimit, chainCount;
+
+    if (ghostsKilled < 3) {
+        // Level 1: mudah, waktu 15 detik, 1 bacaan
+        pool = TEXTS_EASY;
+        timeLimit = 15;
+        chainCount = 1;
+    } else if (ghostsKilled < 7) {
+        // Level 2: sedang, waktu 12 detik, 1 bacaan
+        pool = TEXTS_MEDIUM;
+        timeLimit = 12;
+        chainCount = 1;
+    } else if (ghostsKilled < 10) {
+        // Level 3: sulit, waktu 10 detik, kadang 2 bacaan berantai
+        pool = TEXTS_HARD;
+        timeLimit = 10;
+        chainCount = Math.random() > 0.5 ? 2 : 1;
+    } else {
+        // Level max: sangat sulit, waktu 8 detik, 2 bacaan berantai
+        pool = TEXTS_HARD;
+        timeLimit = 8;
+        chainCount = 2;
+    }
+
+    // Pilih teks acak
+    const text = pool[Math.floor(Math.random() * pool.length)];
+    return { text, timeLimit, chainCount };
+}
+
+/** Semua teks (untuk kompatibilitas) */
+export const CHALLENGE_TEXTS = [...TEXTS_EASY, ...TEXTS_MEDIUM, ...TEXTS_HARD];
 
 export class VoiceChallenge {
     constructor() {
@@ -31,7 +90,6 @@ export class VoiceChallenge {
         this.bestSimilarity = 0;
         this.target = '';
         this._onResult = null;
-        this._onEnd = null;
 
         this.recognition.onresult = (event) => {
             let bestTranscript = '';
@@ -51,58 +109,36 @@ export class VoiceChallenge {
         };
 
         this.recognition.onend = () => {
-            // Restart jika masih listening
-            if (this.isListening) {
-                try { this.recognition.start(); } catch (e) {}
-            }
+            if (this.isListening) try { this.recognition.start(); } catch (e) { }
         };
-
         this.recognition.onerror = (e) => {
-            if (e.error === 'not-allowed') {
-                console.error('Izin mikrofon ditolak.');
-            }
+            if (e.error === 'not-allowed') console.error('Izin mikrofon ditolak.');
         };
     }
 
-    /**
-     * Mulai challenge voice.
-     * @param {string} target — teks target
-     * @param {Function} onResult — callback(similarity, transcript)
-     * @param {Function} onEnd — callback saat challenge selesai
-     */
-    start(target, onResult, onEnd) {
-        if (!this.available) {
-            // Simulasi jika API tidak tersedia
-            this._simulateRecognition(onResult);
-            return;
-        }
+    start(target, onResult) {
+        if (!this.available) { this._simulateRecognition(onResult); return; }
         this.target = target;
         this.bestSimilarity = 0;
         this.isListening = true;
         this._onResult = onResult;
-        this._onEnd = onEnd;
-        try {
-            this.recognition.start();
-        } catch (e) {}
+        try { this.recognition.start(); } catch (e) { }
     }
 
     stop() {
         this.isListening = false;
-        try {
-            this.recognition.stop();
-        } catch (e) {}
+        try { this.recognition.stop(); } catch (e) { }
     }
 
-    /** Simulasi untuk browser yang tidak mendukung. */
     _simulateRecognition(onResult) {
         let sim = 0;
-        const interval = setInterval(() => {
+        const iv = setInterval(() => {
             sim += Math.random() * 15;
             if (sim > 100) sim = 100;
             onResult?.(Math.round(sim), '[simulasi]');
-            if (sim >= 100) clearInterval(interval);
+            if (sim >= 100) clearInterval(iv);
         }, 500);
-        this._simInterval = interval;
+        this._simInterval = iv;
     }
 
     clearSimulation() {
